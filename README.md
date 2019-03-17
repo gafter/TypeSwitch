@@ -1,1 +1,1 @@
-This is an experimental library that might be used as a compiler support API for implementing an efficient type switch construct.
+This is an experimental API that might be used as a compiler support library for implementing an efficient type switch construct.  See https://github.com/dotnet/roslyn/issues/31515 and https://github.com/dotnet/coreclr/issues/23241 for the original motivation.
