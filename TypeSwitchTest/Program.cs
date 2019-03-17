@@ -24,14 +24,14 @@ namespace TypeSwitchTest
         static void Main(string[] args)
         {
             var methods =
-                from m in typeof(DispatchTest).GetMethods(BindingFlags.DeclaredOnly | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+                from m in typeof(TypeSwitchTest).GetMethods(BindingFlags.DeclaredOnly | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
                 from a in m.GetCustomAttributes(false)
                 let t = a as TimedTestAttribute
                 where t != null
                 orderby m.Name
                 select (attr: t, method: m);
 
-            DispatchTest p = new DispatchTest();
+            TypeSwitchTest p = new TypeSwitchTest();
             foreach (var (attr, method) in methods)
             {
                 Console.WriteLine($"Test {method.Name:8}");
