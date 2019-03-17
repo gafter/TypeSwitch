@@ -11,7 +11,6 @@
 //You should have received a copy of the GNU General Public License
 //along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-using System.Diagnostics;
 using System.Threading;
 
 namespace System.Runtime.CompilerServices
@@ -20,7 +19,7 @@ namespace System.Runtime.CompilerServices
     /// A type that computes the first type in a list of types that a given type has a reference conversion to.
     /// It can be used to efficiently implement a type switch for a large number of types.
     /// </summary>
-    public class TypeSwitchDispatch
+    public struct TypeSwitchDispatch
     {
         // The elements of this array do not need to be weak as the Dispatch would typically be stored in a static
         // variable of a class that explicitly references these types.  Until the referencing code is unloaded,
@@ -28,23 +27,27 @@ namespace System.Runtime.CompilerServices
         // variable containing the instance of this type would be gone.
         private readonly Type[] _types;
 
+        // These are allocated lazily.  If GetIndex is never called, _lock and _buckets are never allocated.
         private object _lock;
         private Entry[] _buckets;
         private int _nEntries;
 
         /// <summary>
-        /// The initial number of buckets, which must be a power of two.
+        /// The initial number of buckets, which must be a power of two.  Since we only expect this to be
+        /// used for more than 10 types, and we maintain a load factor in the cache of less than 1/4, we
+        /// use the first power of two greater than 10*4.
         /// </summary>
-        private const int _initialBuckets = 32;
+        private const int _initialBuckets = 64;
 
-        struct Entry
+        private struct Entry
         {
+            // We use a weak reference so that dispatching on a type does not prevent it from being unloaded.
             public WeakReference<Type> ReferenceToType;
             public int TypeHash;
             public int Result;
         }
 
-        public TypeSwitchDispatch(Type[] types)
+        public TypeSwitchDispatch(params Type[] types)
         {
             if (types is null)
                 throw new ArgumentNullException("types");
@@ -56,10 +59,16 @@ namespace System.Runtime.CompilerServices
                 var type = types[i];
                 if (type is null)
                     throw new ArgumentNullException($"types[{i}]");
+
                 copiedTypesArray[i] = type;
             }
 
             this._types = copiedTypesArray;
+            this._nEntries = 0;
+
+            // _lock and _buckets are created lazily
+            this._lock = null;
+            this._buckets = null;
         }
 
         /// <summary>
@@ -114,7 +123,6 @@ namespace System.Runtime.CompilerServices
                 var buckets = this._buckets;
                 int nBuckets = buckets.Length;
                 int mask = nBuckets - 1;
-                var nEntries = this._nEntries;
 
                 int startBucket = typeHash & mask;
                 for (int i = 0; i < nBuckets; i++)
@@ -124,9 +132,10 @@ namespace System.Runtime.CompilerServices
                     if (entry.ReferenceToType is null)
                     {
                         // not found; insert it!
-                        if (expandIfNecessary())
+                        if (ExpandIfNecessary())
                             goto retry;
-                        int result = computeResult();
+
+                        int result = ComputeResult(type);
                         entry.Result = result;
                         entry.TypeHash = typeHash;
                         Interlocked.CompareExchange(ref entry.ReferenceToType, new WeakReference<Type>(type), null);
@@ -140,60 +149,73 @@ namespace System.Runtime.CompilerServices
                 }
 
                 throw new Exception("Unreachable");
-
-                int computeResult()
-                {
-                    var types = _types;
-                    for (int i = 0, n = types.Length; i < n; i++)
-                    {
-                        if (types[i].IsAssignableFrom(type))
-                            return i;
-                    }
-
-                    return -1;
-                }
-
-                bool expandIfNecessary()
-                {
-                    if ((nEntries << 2) < nBuckets)
-                        return false;
-                    int newNBuckets = nBuckets << 1;
-                    int newMask = newNBuckets - 1;
-                    var newBuckets = new Entry[newNBuckets];
-                    for (int j = 0; j < nBuckets; j++)
-                    {
-                        var entryToMove = buckets[j];
-                        if (entryToMove.ReferenceToType is null)
-                        {
-                            continue;
-                        }
-                        else if (!entryToMove.ReferenceToType.TryGetTarget(out _))
-                        {
-                            // clear an expired weak reference while expanding
-                            nEntries = _nEntries = (nEntries - 1);
-                            continue;
-                        }
-
-                        int movedStartBucket = entryToMove.TypeHash & newMask;
-                        for (int k = 0; k < newNBuckets; k++)
-                        {
-                            int newBucket = (k + movedStartBucket) & mask;
-                            if (newBuckets[newBucket].ReferenceToType is null)
-                            {
-                                newBuckets[newBucket] = entryToMove;
-                                goto nextEntry;
-                            }
-                        }
-
-                        throw new Exception("Unreachable");
-
-                    nextEntry:;
-                    }
-
-                    this._buckets = newBuckets;
-                    return true;
-                }
             }
+        }
+
+        /// <summary>
+        /// Compute the result.
+        /// </summary>
+        private int ComputeResult(Type type)
+        {
+            Type[] types = this._types;
+            for (int i = 0, n = types.Length; i < n; i++)
+            {
+                if (types[i].IsAssignableFrom(type))
+                    return i;
+            }
+
+            return -1;
+        }
+
+        /// <summary>
+        /// Expand the <see cref="_buckets"/> array if necessary.  To be called while the lock is held.
+        /// </summary>
+        /// <returns>true if we expanded the <see cref="_buckets"/> array.</returns>
+        private bool ExpandIfNecessary()
+        {
+            // Maintain a load factor of less than 1/4
+            var buckets = this._buckets;
+            int nBuckets = buckets.Length;
+            if ((this._nEntries << 2) < nBuckets)
+                return false;
+
+            int newNBuckets = nBuckets << 1;
+            int newMask = newNBuckets - 1;
+            var newBuckets = new Entry[newNBuckets];
+
+            for (int j = 0; j < nBuckets; j++)
+            {
+                var entryToMove = buckets[j];
+                if (entryToMove.ReferenceToType is null)
+                {
+                    continue;
+                }
+                else if (!entryToMove.ReferenceToType.TryGetTarget(out _))
+                {
+                    // clear an expired weak reference while expanding
+                    this._nEntries--;
+                    continue;
+                }
+
+                int movedStartBucket = entryToMove.TypeHash & newMask;
+                for (int k = 0; k < newNBuckets; k++)
+                {
+                    int newBucket = (k + movedStartBucket) & newMask;
+                    ref Entry bucketEntry = ref newBuckets[newBucket];
+                    if (bucketEntry.ReferenceToType is null)
+                    {
+                        bucketEntry = entryToMove;
+                        goto nextEntry;
+                    }
+                }
+
+                throw new Exception("This location is believed unreachable.");
+
+            nextEntry:;
+            }
+
+            this._buckets = newBuckets;
+            return true;
         }
     }
 }
