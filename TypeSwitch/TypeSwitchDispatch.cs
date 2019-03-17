@@ -28,10 +28,14 @@ namespace System.Runtime.CompilerServices
         // variable containing the instance of this type would be gone.
         private readonly Type[] _types;
 
+        private object _lock;
         private Entry[] _buckets;
-        private int _nBuckets;
-        private int _mask;
         private int _nEntries;
+
+        /// <summary>
+        /// The initial number of buckets, which must be a power of two.
+        /// </summary>
+        private const int _initialBuckets = 32;
 
         struct Entry
         {
@@ -69,19 +73,14 @@ namespace System.Runtime.CompilerServices
             Type type = data.GetType();
             int typeHash = type.GetHashCode();
 
-            int mask;
-            Entry[] buckets;
-            int nBuckets;
-            int nEntries;
-            lock (this)
-            {
-                mask = this._mask;
-                buckets = this._buckets;
-                nBuckets = this._nBuckets;
-                nEntries = this._nEntries;
-            }
+            // First, we try a cache fetch without locks.  If the entry is not found, we lock and do it the hard way.
+            Entry[] buckets = this._buckets;
+            if (buckets is null)
+                return GetIndexSlow(type, typeHash);
 
-            // First, try a lookup with minimal locking
+            int nBuckets = buckets.Length;
+            int mask = nBuckets - 1;
+
             int startBucket = typeHash & mask;
             for (int i = 0; i < nBuckets; i++)
             {
@@ -98,27 +97,23 @@ namespace System.Runtime.CompilerServices
                 }
             }
 
-            Debug.Assert(buckets is null);
-            return GetIndexSlow(type, typeHash);
+            throw new Exception("This location is believed unreachable.");
         }
 
         private int GetIndexSlow(Type type, int typeHash)
         {
-            lock (this)
+            if (this._lock is null)
+                Interlocked.CompareExchange(ref this._lock, new object(), null);
+
+            lock (this._lock)
             {
                 if (this._buckets is null)
-                {
-                    const int startNbuckets = 32;
-                    this._nBuckets = startNbuckets;
-                    this._buckets = new Entry[startNbuckets];
-                    this._mask = _nBuckets - 1;
-                    this._nEntries = 0;
-                }
+                    this._buckets = new Entry[_initialBuckets];
 
             retry:;
-                var mask = this._mask;
                 var buckets = this._buckets;
-                var nBuckets = this._nBuckets;
+                int nBuckets = buckets.Length;
+                int mask = nBuckets - 1;
                 var nEntries = this._nEntries;
 
                 int startBucket = typeHash & mask;
@@ -160,7 +155,7 @@ namespace System.Runtime.CompilerServices
 
                 bool expandIfNecessary()
                 {
-                    if ((nEntries << 1) < nBuckets)
+                    if ((nEntries << 2) < nBuckets)
                         return false;
                     int newNBuckets = nBuckets << 1;
                     int newMask = newNBuckets - 1;
@@ -195,9 +190,7 @@ namespace System.Runtime.CompilerServices
                     nextEntry:;
                     }
 
-                    this._mask = newMask;
                     this._buckets = newBuckets;
-                    this._nBuckets = newNBuckets;
                     return true;
                 }
             }
