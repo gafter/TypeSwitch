@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.28716.10
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TypeSwitch", "TypeSwitch\TypeSwitch.csproj", "{1F1636BF-D113-473C-BFFF-E58BD2CE1A56}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TypeSwitchTest", "TypeSwitchTest\TypeSwitchTest.csproj", "{4F7894BE-5027-4AD9-BFF2-419CF50B8D0C}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{1F1636BF-D113-473C-BFFF-E58BD2CE1A56}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1F1636BF-D113-473C-BFFF-E58BD2CE1A56}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1F1636BF-D113-473C-BFFF-E58BD2CE1A56}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1F1636BF-D113-473C-BFFF-E58BD2CE1A56}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4F7894BE-5027-4AD9-BFF2-419CF50B8D0C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4F7894BE-5027-4AD9-BFF2-419CF50B8D0C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4F7894BE-5027-4AD9-BFF2-419CF50B8D0C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4F7894BE-5027-4AD9-BFF2-419CF50B8D0C}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {38126130-3AB9-411E-8DE4-5043BCB374D1}
+	EndGlobalSection
+EndGlobal
