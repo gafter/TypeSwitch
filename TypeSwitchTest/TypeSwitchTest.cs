@@ -198,8 +198,6 @@ namespace TypeSwitchTest
         static int T2_LazyMap()
         {
             int sum = 0;
-            int nTypesOfSwitch = _nTypesOfSwitch;
-
             for (int i = 0; i < repeats; i++)
             {
                 foreach (var d in _testDataToSwitchOn)
