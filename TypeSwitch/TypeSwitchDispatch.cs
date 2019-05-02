@@ -96,15 +96,18 @@ namespace System.Runtime.CompilerServices
             for (int i = 0; i < nBuckets; i++)
             {
                 int bucket = (i + startBucket) & mask;
-                Entry entry = buckets[bucket]; // possible struct tearing here, but the writes were ordered so it doesn't matter
-                if (entry.ReferenceToType is null)
+                ref Entry entry = ref buckets[bucket];
+                var entryReferenceToType = Volatile.Read(ref entry.ReferenceToType);
+                if (entryReferenceToType is null)
                 {
                     // not found; insert it!
                     return GetIndexSlow(type, typeHash);
                 }
-                else if (entry.TypeHash == typeHash && entry.ReferenceToType.TryGetTarget(out Type entryType) && type.Equals(entryType))
+
+                var entryTypeHash = Volatile.Read(ref entry.TypeHash);
+                if (entryTypeHash == typeHash && entryReferenceToType.TryGetTarget(out Type entryType) && type.Equals(entryType))
                 {
-                    return entry.Result;
+                    return Volatile.Read(ref entry.Result);
                 }
             }
 
@@ -138,9 +141,9 @@ namespace System.Runtime.CompilerServices
                             goto retry;
 
                         int result = ComputeResult(type);
-                        entry.Result = result;
-                        entry.TypeHash = typeHash;
-                        Interlocked.CompareExchange(ref entry.ReferenceToType, new WeakReference<Type>(type), null);
+                        Volatile.Write(ref entry.Result, result);
+                        Volatile.Write(ref entry.TypeHash, typeHash);
+                        Volatile.Write(ref entry.ReferenceToType, new WeakReference<Type>(type));
                         this._nEntries++;
                         return result;
                     }

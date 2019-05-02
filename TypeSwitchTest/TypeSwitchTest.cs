@@ -128,18 +128,18 @@ namespace TypeSwitchTest
                         //C15 _ => 15,
                         //C14 _ => 14,
                         //C13 _ => 13,
-                        //C12 _ => 12,
-                        //C11 _ => 11,
-                        C10 _ => 10,
-                        C9 _ => 9,
-                        C8 _ => 8,
-                        C7 _ => 7,
-                        C6 _ => 6,
-                        C5 _ => 5,
-                        C4 _ => 4,
-                        C3 _ => 3,
-                        C2 _ => 2,
-                        C1 _ => 1,
+                        C12 _ => 12,
+                        C11 _ => 11,
+                        C10 x => 10,
+                        C9 x => 9,
+                        C8 x => 8,
+                        C7 x => 7,
+                        C6 x => 6,
+                        C5 x => 5,
+                        C4 x => 4,
+                        C3 x => 3,
+                        C2 x => 2,
+                        C1 x => 1,
                         _ => -1
                     };
                 }
@@ -178,8 +178,8 @@ namespace TypeSwitchTest
             //typeof(C15),
             //typeof(C14),
             //typeof(C13),
-            //typeof(C12),
-            //typeof(C11),
+            typeof(C12),
+            typeof(C11),
             typeof(C10),
             typeof(C9),
             typeof(C8),
@@ -204,8 +204,23 @@ namespace TypeSwitchTest
             {
                 foreach (var d in _testDataToSwitchOn)
                 {
-                    int index = _typeSwitchDispatch.GetIndex(d);
-                    sum += (index == -1) ? index : (nTypesOfSwitch - index);
+                    sum += _typeSwitchDispatch.GetIndex(d) switch
+                    {
+                        0 when d is C12 x => 12,
+                        1 when d is C11 x => 11,
+                        2 when d is C10 x => 10,
+                        3 when d is C9 x => 9,
+                        4 when d is C8 x => 8,
+                        5 when d is C7 x => 7,
+                        6 when d is C6 x => 6,
+                        7 when d is C5 x => 5,
+                        8 when d is C4 x => 4,
+                        9 when d is C3 x => 3,
+                        10 when d is C2 x => 2,
+                        11 when d is C1 x => 1,
+                        -1 => -1,
+                        _ => throw null,
+                    };
                 }
             }
 
