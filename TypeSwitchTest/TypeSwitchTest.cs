@@ -33,193 +33,158 @@ namespace TypeSwitchTest
                 orderby m.Name
                 select (attr: t, method: m);
 
-            TypeSwitchTest p = new TypeSwitchTest();
-            foreach (var (attr, method) in methods)
+            // warm up the caches
+            repeats = 10;
+            foreach (var d in _testDataToSwitchOn)
             {
-                Console.WriteLine($"Test {method.Name:8}");
-                Stopwatch w = Stopwatch.StartNew();
-                var result = method.Invoke(p, Array.Empty<object>()).ToString();
-                w.Stop();
-                Console.WriteLine($"  Elapsed: {w.Elapsed} Result {result}");
+                object[] a = new[] { d };
+                foreach (var (attr, method) in methods)
+                {
+                    var result = method.Invoke(null, a).ToString();
+                }
+            }
+
+            // run the tests
+            repeats = 20000000;
+            foreach (var d in _testDataToSwitchOn)
+            {
+                object[] a = new[] { d };
+                Console.WriteLine(d.GetType().Name);
+                foreach (var (attr, method) in methods)
+                {
+                    Console.Write($" Test {method.Name:8}");
+                    Stopwatch w = Stopwatch.StartNew();
+                    var result = method.Invoke(null, a).ToString();
+                    w.Stop();
+                    Console.WriteLine($" Elapsed: {w.Elapsed} Result {result}");
+                }
             }
         }
 
-        const int repeats = 5000000;
+        static int repeats = 20000000;
 
         static readonly object[] _testDataToSwitchOn =
         {
-            //new C40(),
-            //new C39(),
-            //new C38(),
-            //new C37(),
-            //new C36(),
-            new C35(),
-            new C34(),
-            new C33(),
-            new C32(),
-            new C31(),
-            new C30(),
-            new C29(),
-            new C28(),
-            new C27(),
-            new C26(),
-            new C25(),
-            new C24(),
-            new C23(),
-            new C22(),
-            new C21(),
-            new C20(),
-            new C19(),
-            new C18(),
-            new C17(),
-            new C16(),
-            new C15(),
-            new C14(),
-            new C13(),
-            new C12(),
-            new C11(),
-            new C10(),
-            new C9(),
-            new C8(),
-            new C7(),
-            new C6(),
+            new C0(),
+            //new C1(),
+            //new C2(),
+            //new C3(),
+            //new C4(),
             new C5(),
-            new C4(),
-            new C3(),
-            new C2(),
-            new C1(),
+            //new C6(),
+            //new C7(),
+            //new C8(),
+            //new C9(),
+            new C10(),
+            new C11(),
+            new C12(),
+            new C13(),
+            new C14(),
+            new C15(),
+            new C16(),
+            new C17(),
+            new C18(),
+            new C19(),
+            new C20(),
+            //new C21(),
+            //new C22(),
+            //new C23(),
+            //new C24(),
+            new C25(),
+            //new C26(),
+            //new C27(),
+            //new C28(),
+            //new C29(),
+            new C30(),
         };
 
         [TimedTest]
-        static int T1_TypeSwitch()
+        static int T1_TypeSwitch(object d)
         {
-            int sum = 0;
+                int sum = 0;
             for (int i = 0; i < repeats; i++)
             {
-                foreach (var d in _testDataToSwitchOn)
+                sum += d switch
                 {
-                    sum += d switch
-                    {
-                        //C40 _ => 40,
-                        //C39 _ => 39,
-                        //C38 _ => 38,
-                        //C37 _ => 37,
-                        //C36 _ => 36,
-                        //C35 _ => 35,
-                        //C34 _ => 34,
-                        //C33 _ => 33,
-                        //C32 _ => 32,
-                        //C31 _ => 31,
-                        //C30 _ => 30,
-                        //C29 _ => 29,
-                        //C28 _ => 28,
-                        //C27 _ => 27,
-                        //C26 _ => 26,
-                        //C25 _ => 25,
-                        //C24 _ => 24,
-                        //C23 _ => 23,
-                        //C22 _ => 22,
-                        //C21 _ => 21,
-                        //C20 _ => 20,
-                        //C19 _ => 19,
-                        //C18 _ => 18,
-                        //C17 _ => 17,
-                        //C16 _ => 16,
-                        //C15 _ => 15,
-                        //C14 _ => 14,
-                        //C13 _ => 13,
-                        C12 _ => 12,
-                        C11 _ => 11,
-                        C10 x => 10,
-                        C9 x => 9,
-                        C8 x => 8,
-                        C7 x => 7,
-                        C6 x => 6,
-                        C5 x => 5,
-                        C4 x => 4,
-                        C3 x => 3,
-                        C2 x => 2,
-                        C1 x => 1,
-                        _ => -1
-                    };
-                }
+                    C0 _ => 0,
+                    C1 _ => 1,
+                    C2 _ => 2,
+                    C3 _ => 3,
+                    C4 _ => 4,
+                    C5 _ => 5,
+                    C6 _ => 6,
+                    C7 _ => 7,
+                    C8 _ => 8,
+                    C9 _ => 9,
+                    C10 _ => 10,
+                    C11 _ => 11,
+                    C12 _ => 12,
+                    C13 _ => 13,
+                    C14 _ => 14,
+                    C15 _ => 15,
+                    C16 _ => 16,
+                    C17 _ => 17,
+                    C18 _ => 18,
+                    C19 _ => 19,
+                    C20 _ => 20,
+                    C21 _ => 21,
+                    C22 _ => 22,
+                    C23 _ => 23,
+                    C24 _ => 24,
+                    C25 _ => 25,
+                    C26 _ => 26,
+                    C27 _ => 27,
+                    C28 _ => 28,
+                    C29 _ => 29,
+                    C30 _ => 30,
+                    _ => -1
+                };
             }
 
             return sum;
         }
 
-        static readonly Type[] _typesOfTypeSwitch =
-        {
-            //typeof(C40),
-            //typeof(C39),
-            //typeof(C38),
-            //typeof(C37),
-            //typeof(C36),
-            //typeof(C35),
-            //typeof(C34),
-            //typeof(C33),
-            //typeof(C32),
-            //typeof(C31),
-            //typeof(C30),
-            //typeof(C29),
-            //typeof(C28),
-            //typeof(C27),
-            //typeof(C26),
-            //typeof(C25),
-            //typeof(C24),
-            //typeof(C23),
-            //typeof(C22),
-            //typeof(C21),
-            //typeof(C20),
-            //typeof(C19),
-            //typeof(C18),
-            //typeof(C17),
-            //typeof(C16),
-            //typeof(C15),
-            //typeof(C14),
-            //typeof(C13),
-            typeof(C12),
-            typeof(C11),
-            typeof(C10),
-            typeof(C9),
-            typeof(C8),
-            typeof(C7),
-            typeof(C6),
-            typeof(C5),
-            typeof(C4),
-            typeof(C3),
-            typeof(C2),
-            typeof(C1),
-        };
-        static TypeSwitchDispatch _typeSwitchDispatch = new TypeSwitchDispatch(_typesOfTypeSwitch);
-        static int _nTypesOfSwitch = _typesOfTypeSwitch.Length;
-
         [TimedTest]
-        static int T2_LazyMap()
+        static int T2_LazyMap(object d)
         {
             int sum = 0;
             for (int i = 0; i < repeats; i++)
             {
-                foreach (var d in _testDataToSwitchOn)
+                sum += TypeSwitchDispatch.GetIndex<(C0, C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C22, C23, C24, C25, C26, C27, C28, C29, C30)>(d) switch
                 {
-                    sum += _typeSwitchDispatch.GetIndex(d) switch
-                    {
-                        0 when d is C12 x => 12,
-                        1 when d is C11 x => 11,
-                        2 when d is C10 x => 10,
-                        3 when d is C9 x => 9,
-                        4 when d is C8 x => 8,
-                        5 when d is C7 x => 7,
-                        6 when d is C6 x => 6,
-                        7 when d is C5 x => 5,
-                        8 when d is C4 x => 4,
-                        9 when d is C3 x => 3,
-                        10 when d is C2 x => 2,
-                        11 when d is C1 x => 1,
-                        -1 => -1,
-                        _ => throw null,
-                    };
-                }
+                    0 => 0,
+                    1 => 1,
+                    2 => 2,
+                    3 => 3,
+                    4 => 4,
+                    5 => 5,
+                    6 => 6,
+                    7 => 7,
+                    8 => 8,
+                    9 => 9,
+                    10 => 10,
+                    11 => 11,
+                    12 => 12,
+                    13 => 13,
+                    14 => 14,
+                    15 => 15,
+                    16 => 16,
+                    17 => 17,
+                    18 => 18,
+                    19 => 19,
+                    20 => 20,
+                    21 => 21,
+                    22 => 22,
+                    23 => 23,
+                    24 => 24,
+                    25 => 25,
+                    26 => 26,
+                    27 => 27,
+                    28 => 28,
+                    29 => 29,
+                    30 => 30,
+                    _ => -1,
+                };
             }
 
             return sum;
@@ -232,44 +197,34 @@ public class TimedTestAttribute : Attribute
 }
 
 abstract class Base { }
+class C0 : Base { }
 class C1 : Base { }
-class C2 : C1 { }
+class C2 : Base { }
 class C3 : Base { }
-class C4 : C3 { }
+class C4 : Base { }
 class C5 : Base { }
 class C6 : Base { }
-class C7 : C5 { }
-class C8 : C7 { }
-class C9 : C4 { }
+class C7 : Base { }
+class C8 : Base { }
+class C9 : Base { }
 class C10 : Base { }
 class C11 : Base { }
-class C12 : C5 { }
+class C12 : Base { }
 class C13 : Base { }
 class C14 : Base { }
-class C15 : C5 { }
+class C15 : Base { }
 class C16 : Base { }
-class C17 : C9 { }
-class C18 : C2 { }
-class C19 : C18 { }
+class C17 : Base { }
+class C18 : Base { }
+class C19 : Base { }
 class C20 : Base { }
 class C21 : Base { }
 class C22 : Base { }
 class C23 : Base { }
 class C24 : Base { }
 class C25 : Base { }
-class C26 : C19 { }
-class C27 : C5 { }
-class C28 : C2 { }
+class C26 : Base { }
+class C27 : Base { }
+class C28 : Base { }
 class C29 : Base { }
 class C30 : Base { }
-class C31 : Base { }
-class C32 : Base { }
-class C33 : Base { }
-class C34 : Base { }
-class C35 : C19 { }
-class C36 : C4 { }
-class C37 : Base { }
-class C38 : Base { }
-class C39 : Base { }
-class C40 : C33 { }
-

@@ -21,12 +21,20 @@ namespace System.Runtime.CompilerServices
     /// A type that computes the first type in a list of types that a given type has a reference conversion to.
     /// It can be used to efficiently implement a type switch for a large number of types.
     /// </summary>
-    public struct TypeSwitchDispatch
+    public class TypeSwitchDispatch
     {
-        // The elements of this array do not need to be weak as the Dispatch would typically be stored in a static
-        // variable of a class that explicitly references these types.  Until the referencing code is unloaded,
-        // those referenced types cannot be unloaded.  And once the referencing code is unloaded, the static
-        // variable containing the instance of this type would be gone.
+        /// <summary>
+        /// We key our dispatch table on tuple types.  The element types of the tuple type are the types we are dispatching on.
+        /// </summary>
+        private static readonly ConditionalWeakTable<Type, TypeSwitchDispatch> s_dispatchForTuple =
+            new ConditionalWeakTable<Type, TypeSwitchDispatch>();
+
+        private static readonly ConditionalWeakTable<Type, TypeSwitchDispatch>.CreateValueCallback s_createValueCallback = CreateDispatchForTuple;
+
+        // The elements of this array do not need to be weak as the Dispatch is stored in a conditional weak table
+        // keyed by a type mentioned in the code.  Until the referencing code is unloaded,
+        // those referenced types cannot be unloaded.  And once the referencing code is unloaded, the type
+        // that is a key would have been unloaded.
         private readonly Type[] _types;
 
         // These are allocated lazily.  If GetIndex is never called, _lock and _buckets are never allocated.
@@ -46,26 +54,15 @@ namespace System.Runtime.CompilerServices
             // We use a weak reference so that dispatching on a type does not prevent it from being unloaded.
             public WeakReference<Type> ReferenceToType;
             public int TypeHash;
-            public int Result;
+            public uint Result;
         }
 
-        public TypeSwitchDispatch(params Type[] types)
+        private TypeSwitchDispatch(Type[] types)
         {
             if (types is null)
                 throw new ArgumentNullException("types");
 
-            int n = types.Length;
-            var copiedTypesArray = new Type[n];
-            for (int i = 0; i < n; i++)
-            {
-                var type = types[i];
-                if (type is null)
-                    throw new ArgumentNullException($"types[{i}]");
-
-                copiedTypesArray[i] = type;
-            }
-
-            this._types = copiedTypesArray;
+            this._types = types;
             this._nEntries = 0;
 
             // _lock and _buckets are created lazily
@@ -74,12 +71,84 @@ namespace System.Runtime.CompilerServices
         }
 
         /// <summary>
+        /// Given a tuple type the elements of which are the types we would like to dispatch on, and an object,
+        /// return the index of the tuple element which is the first whose type the object is a subtype of.
+        /// If the object is null or is not a subtype of any of those element types, returns the number of
+        /// elements in the tuple type.
+        /// </summary>
+        public static uint GetIndex<T>(object o)
+        {
+            return GetIndex(typeof(T), o);
+        }
+
+        private static TypeSwitchDispatch CreateDispatchForTuple(Type t)
+        {
+            Type[] types = new Type[count(t)];
+            fill(types, 0, t);
+            return new TypeSwitchDispatch(types);
+
+            static int count(Type t)
+            {
+                int n = 0;
+                while (t.IsGenericType)
+                {
+                    Type[] arguments = t.GenericTypeArguments;
+                    int count = arguments.Length;
+                    if (count == 8)
+                    {
+                        n += 7;
+                        t = arguments[7];
+                    }
+                    else if (count < 8)
+                    {
+                        return n + count;
+                    }
+                    else
+                    {
+                        throw new System.ArgumentException("type argument for Dispatch");
+                    }
+                }
+
+                throw new System.ArgumentException("type argument for Dispatch");
+            }
+
+            static void fill(Type[] types, int next, Type t)
+            {
+                while (t.IsGenericType)
+                {
+                    Type[] arguments = t.GenericTypeArguments;
+                    int count = arguments.Length;
+                    if (count == 8)
+                    {
+                        for (int i = 0; i < 7; i++)
+                            types[next++] = arguments[i];
+                        t = arguments[7];
+                    }
+                    else
+                    {
+                        for (int i = 0; i < count; i++)
+                            types[next++] = arguments[i];
+                        return;
+                    }
+                }
+
+                throw new InvalidOperationException("This program location is thought to be unreachable.");
+            }
+        }
+
+        private static uint GetIndex(Type tuple, object o)
+        {
+            TypeSwitchDispatch d = s_dispatchForTuple.GetValue(tuple, s_createValueCallback);
+            return d.GetIndex(o);
+        }
+
+        /// <summary>
         /// Get the index of the first type in the original list of types to which this data's type can be assigned.
         /// </summary>
-        public int GetIndex(object data)
+        private uint GetIndex(object data)
         {
             if (data is null)
-                return -1;
+                return (uint)_types.Length;
 
             Type type = data.GetType();
             int typeHash = type.GetHashCode();
@@ -114,7 +183,7 @@ namespace System.Runtime.CompilerServices
             throw new Exception("This location is believed unreachable.");
         }
 
-        private int GetIndexSlow(Type type, int typeHash)
+        private uint GetIndexSlow(Type type, int typeHash)
         {
             if (this._lock is null)
                 Interlocked.CompareExchange(ref this._lock, new object(), null);
@@ -140,7 +209,7 @@ namespace System.Runtime.CompilerServices
                         if (ExpandIfNecessary())
                             goto retry;
 
-                        int result = ComputeResult(type);
+                        uint result = ComputeResult(type);
                         Volatile.Write(ref entry.Result, result);
                         Volatile.Write(ref entry.TypeHash, typeHash);
                         Volatile.Write(ref entry.ReferenceToType, new WeakReference<Type>(type));
@@ -160,16 +229,17 @@ namespace System.Runtime.CompilerServices
         /// <summary>
         /// Compute the result.
         /// </summary>
-        private int ComputeResult(Type type)
+        private uint ComputeResult(Type type)
         {
             Type[] types = this._types;
-            for (int i = 0, n = types.Length; i < n; i++)
+            uint n = (uint)types.Length;
+            for (uint i = 0; i < n; i++)
             {
                 if (types[i].IsAssignableFrom(type))
                     return i;
             }
 
-            return -1;
+            return n;
         }
 
         /// <summary>
